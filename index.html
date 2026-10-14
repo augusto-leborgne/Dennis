@@ -108,6 +108,19 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .huggers{display:flex;justify-content:center;gap:clamp(12px,4vw,36px);margin-bottom:30px}
 .hugger{display:grid;background:var(--paper);padding:6px 6px 0;width:clamp(92px,26vw,180px);box-shadow:0 24px 50px rgba(0,0,0,.55);transform:rotate(var(--r,0deg));transition:transform .4s ease}
 .hugger:hover,.hugger:focus-visible{transform:translateY(-8px)}
+.hugger.shake{animation:shake .5s ease-in-out 2}
+@keyframes shake{
+  0%,100%{transform:rotate(var(--r,0deg))}
+  20%{transform:translateX(-6px) rotate(calc(var(--r,0deg) - 4deg))}
+  40%{transform:translateX(6px) rotate(calc(var(--r,0deg) + 4deg))}
+  60%{transform:translateX(-4px) rotate(calc(var(--r,0deg) - 2deg))}
+  80%{transform:translateX(4px) rotate(calc(var(--r,0deg) + 2deg))}
+}
+.nudge{display:grid;place-items:center;min-height:36px}
+.nudge > *{grid-area:1/1;transition:opacity .4s ease}
+.sure{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-weight:600;font-size:clamp(24px,6vw,34px);opacity:0}
+.nudge.doubt .kicker{opacity:0}
+.nudge.doubt .sure{opacity:1}
 .pic{aspect-ratio:4/5;overflow:hidden;background:#222}
 .pic img,.pic .ph{display:block;width:100%;height:100%;object-fit:cover}
 .hugger .who{font-family:var(--serif);font-weight:600;text-transform:uppercase;letter-spacing:.14em;padding:10px 0 12px .14em;color:#1a191b;font-size:clamp(11px,2.8vw,16px)}
@@ -154,7 +167,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
     <h2>One free hug token</h2>
     <span class="from">from</span>
     <div class="huggers" id="huggers"></div>
-    <span class="kicker">Choose wisely · you only get one</span>
+    <div class="nudge" id="nudge">
+      <span class="kicker">Choose wisely · you only get one</span>
+      <span class="sure" aria-live="polite">¿Estás seguro?</span>
+    </div>
   </div>
   <div class="token">
     <div class="ticket">
@@ -432,13 +448,23 @@ var HUGGERS = [
     b.appendChild(portrait(h,i));
     var who=document.createElement("span");who.className="who";who.textContent=h.name;b.appendChild(who);
     b.addEventListener("click",function(){
+      // anyone but Huevo has to be picked twice: the first tap asks
+      // "¿Estás seguro?" and gives Huevo's photo a little shake
+      if(h.name!=="Huevo"&&doubted!==h){
+        doubted=h;$("nudge").classList.add("doubt");
+        var fav=$("huggers").children[HUGGERS.findIndex(function(x){return x.name==="Huevo"})];
+        if(fav){fav.classList.remove("shake");void fav.offsetWidth;fav.classList.add("shake");}
+        return;
+      }
       var pic=portrait(h,i);pic.id="ticketPic";$("ticketPic").replaceWith(pic);
       $("ticketName").textContent=h.name;
       gift.classList.add("chosen");
       chosen=h;tokenBlob=null;tokenReady=renderToken(h,pic);
     });
+    b.addEventListener("animationend",function(){b.classList.remove("shake")});
     $("huggers").appendChild(b);
   });
+  var doubted=null;
   $("collect").addEventListener("click",function(){
     end.classList.remove("on");
     gift.inert=false;gift.classList.add("on");
@@ -521,6 +547,7 @@ var HUGGERS = [
 
   function reset(){
     gift.classList.remove("on","chosen");gift.inert=true;chosen=null;tokenBlob=null;
+    doubted=null;$("nudge").classList.remove("doubt");
     end.classList.remove("on");
     scene.classList.remove("is-open","done");
     timers.forEach(clearTimeout);timers=[];videoLaunched=false;
