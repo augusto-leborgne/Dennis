@@ -88,10 +88,11 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .letter p{font-size:16px;line-height:1.7;color:#d9d3c9;margin:0}
 .letter .sig{font-family:var(--serif);font-style:italic;font-size:24px;color:var(--gilt)}
 .again{justify-self:start;font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);padding:10px 0;border-bottom:1px solid rgba(239,233,223,.2)}
-.collect{position:absolute;left:50%;bottom:25%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 32px);font-family:var(--mono);font-size:11px;letter-spacing:.26em;text-transform:uppercase;padding:13px 22px;border:1px solid rgba(239,233,223,.25);opacity:0;transition:opacity 1.2s ease,border-color .4s}
+.collect,.download{width:max-content;max-width:calc(100vw - 32px);font-family:var(--mono);font-size:11px;letter-spacing:.26em;text-transform:uppercase;padding:13px 22px;border:1px solid rgba(239,233,223,.25);transition:border-color .4s}
+.collect{position:absolute;left:50%;bottom:25%;transform:translateX(-50%);opacity:0;transition:opacity 1.2s ease,border-color .4s}
 .end.on .collect{opacity:1;transition:opacity 1.2s ease 2.4s,border-color .4s}
 .end.on .collect:not(:hover){animation:glint 3.2s ease-in-out 3.6s infinite}
-.collect:hover{border-color:var(--gilt)}
+.collect:hover,.download:hover{border-color:var(--gilt)}
 @keyframes glint{50%{border-color:rgba(142,147,153,.9)}}
 
 /* ---------- Gift ---------- */
@@ -115,7 +116,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .ticket .what,.ticket .name{margin:0;font-family:var(--serif);font-weight:600;text-transform:uppercase;letter-spacing:.14em;padding-left:.14em;line-height:1.1;font-size:clamp(26px,7vw,36px)}
 .ticket .from{margin:10px 0 8px}
 .ticket .terms{width:100%;margin-top:22px;padding-top:16px;border-top:1px dashed rgba(239,233,223,.2)}
-.token > .kicker{margin-top:22px;opacity:.7}
+.download{margin-top:26px}
 
 /* preview helper, remove before sending */
 .setup{position:fixed;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:50;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border:1px dashed rgba(239,233,223,.25);padding:9px 12px;cursor:pointer;background:rgba(11,11,12,.7)}
@@ -159,9 +160,9 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
       <p class="what">Free hug</p>
       <span class="from">from</span>
       <p class="name" id="ticketName"></p>
-      <span class="kicker terms">Valid forever · Redeem in person</span>
+      <span class="kicker terms">Valid forever<br>Redeem in person</span>
     </div>
-    <span class="kicker">Screenshot to keep it</span>
+    <button class="download" id="download" type="button">Download your token</button>
   </div>
 </div>
 
@@ -403,6 +404,7 @@ var HUGGERS = [
       var pic=portrait(h,i);pic.id="ticketPic";$("ticketPic").replaceWith(pic);
       $("ticketName").textContent=h.name;
       gift.classList.add("chosen");
+      chosen=h;tokenBlob=null;tokenReady=renderToken(h,pic);
     });
     $("huggers").appendChild(b);
   });
@@ -411,8 +413,83 @@ var HUGGERS = [
     gift.inert=false;gift.classList.add("on");
   });
 
+  /* the token is drawn onto a canvas as soon as it's picked, so the
+     download button can hand over the image instantly when tapped */
+  var chosen=null,tokenBlob=null,tokenReady=null;
+  function spaced(x,text,cx,y,sp){
+    var w=-sp,i;
+    for(i=0;i<text.length;i++)w+=x.measureText(text[i]).width+sp;
+    var px=cx-w/2;
+    for(i=0;i<text.length;i++){x.fillText(text[i],px,y);px+=x.measureText(text[i]).width+sp;}
+  }
+  function drawToken(h,img){
+    var S=3,W=360,H=448,L=20,T=20,TW=320,TH=408,cx=W/2,r=60,cy=145;
+    var cv=document.createElement("canvas");cv.width=W*S;cv.height=H*S;
+    var x=cv.getContext("2d");x.scale(S,S);x.textAlign="left";
+    x.fillStyle="#0b0b0c";x.fillRect(0,0,W,H);
+    var g=x.createLinearGradient(0,T,0,T+TH);g.addColorStop(0,"#1b1a1d");g.addColorStop(1,"#151416");
+    x.fillStyle=g;x.fillRect(L,T,TW,TH);
+    x.lineWidth=1;
+    x.strokeStyle="#8e9399";x.strokeRect(L+.5,T+.5,TW-1,TH-1);
+    x.strokeStyle="rgba(142,147,153,.3)";x.strokeRect(L+8.5,T+8.5,TW-17,TH-17);
+    var mono='400 11px "DM Mono",ui-monospace,Menlo,monospace',serif=function(wt,px){return wt+" "+px+'px Cinzel,Georgia,serif'};
+    x.fillStyle="#8d877e";x.font=mono;spaced(x,"ADMIT ONE",cx,61,3.3);
+    x.save();x.beginPath();x.arc(cx,cy,r,0,Math.PI*2);x.clip();
+    x.fillStyle="#222";x.fillRect(cx-r,cy-r,2*r,2*r);
+    if(img){
+      var s=Math.max(2*r/img.naturalWidth,2*r/img.naturalHeight),dw=img.naturalWidth*s,dh=img.naturalHeight*s;
+      var f=(h.focus||"50% 50%").split(" ").map(function(v){return parseFloat(v)/100});
+      x.drawImage(img,cx-r+(2*r-dw)*f[0],cy-r+(2*r-dh)*f[1],dw,dh);
+    }else{x.fillStyle="rgba(239,233,223,.25)";x.font=serif(700,44);spaced(x,h.name.charAt(0),cx,cy+16,0);}
+    x.restore();
+    x.beginPath();x.arc(cx,cy,r-.5,0,Math.PI*2);x.strokeStyle="#8e9399";x.stroke();
+    x.fillStyle="#e9e8e4";x.font=serif(600,36);spaced(x,"FREE HUG",cx,253,5);
+    x.fillStyle="#8d877e";x.font=serif(500,18);spaced(x,"FROM",cx,285,5.4);
+    var name=h.name.toUpperCase(),fs=36;
+    do{x.font=serif(600,fs);fs-=2}while(fs>16&&x.measureText(name).width+name.length*fs*.14>TW-52);
+    x.fillStyle="#e9e8e4";spaced(x,name,cx,327,(fs+2)*.14);
+    x.setLineDash([3,3]);x.strokeStyle="rgba(239,233,223,.2)";
+    x.beginPath();x.moveTo(L+26,359.5);x.lineTo(L+TW-26,359.5);x.stroke();
+    x.fillStyle="#8d877e";x.font=mono;spaced(x,"VALID FOREVER",cx,386,3.3);spaced(x,"REDEEM IN PERSON",cx,404,3.3);
+    return cv;
+  }
+  function renderToken(h,pic){
+    var img=pic.querySelector("img");
+    var loaded=new Promise(function(res){
+      if(!img||img.complete)res();else{img.addEventListener("load",res);img.addEventListener("error",res);}
+    });
+    var fonts=document.fonts?Promise.all([
+      document.fonts.load('600 36px Cinzel'),document.fonts.load('500 18px Cinzel'),document.fonts.load('400 11px "DM Mono"')
+    ]).catch(function(){}):null;
+    return Promise.all([loaded,fonts]).then(function(){
+      var ok=img&&img.isConnected&&img.naturalWidth;
+      return new Promise(function(res){drawToken(h,ok?img:null).toBlob(res,"image/png")});
+    }).then(function(b){if(chosen===h)tokenBlob=b;return b});
+  }
+  function saveToken(b){
+    var fname="hug-token-"+chosen.name.toLowerCase()+".png";
+    // on phones, open the share sheet so it can go straight to Photos
+    if(window.File&&navigator.canShare&&matchMedia("(pointer: coarse)").matches){
+      var file=new File([b],fname,{type:"image/png"});
+      if(navigator.canShare({files:[file]})){
+        navigator.share({files:[file]}).catch(function(e){if(e&&e.name!=="AbortError")download(b,fname)});
+        return;
+      }
+    }
+    download(b,fname);
+  }
+  function download(b,fname){
+    var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=fname;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href)},5000);
+  }
+  $("download").addEventListener("click",function(){
+    if(!chosen)return;
+    if(tokenBlob)saveToken(tokenBlob);else if(tokenReady)tokenReady.then(saveToken);
+  });
+
   function reset(){
-    gift.classList.remove("on","chosen");gift.inert=true;
+    gift.classList.remove("on","chosen");gift.inert=true;chosen=null;tokenBlob=null;
     end.classList.remove("on");
     scene.classList.remove("is-open","done");
     timers.forEach(clearTimeout);timers=[];videoLaunched=false;
