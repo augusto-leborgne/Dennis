@@ -67,8 +67,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 .video-card{cursor:default}
 .lyrics{display:grid;place-items:center;height:clamp(40px,10vw,58px);margin-bottom:-10px}
-.lyric{grid-area:1/1;font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-weight:500;letter-spacing:.01em;color:#1a191b;font-size:clamp(22px,6vw,34px);line-height:1;white-space:nowrap;opacity:0;transition:opacity .25s ease}
+.lyric{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-weight:500;letter-spacing:.01em;color:#1a191b;font-size:clamp(22px,6vw,34px);line-height:1;white-space:nowrap;opacity:0;transition:opacity .2s ease}
 .lyric.on{opacity:1}
+.lyric.in{animation:lyricIn .2s ease}
+@keyframes lyricIn{from{opacity:0}}
 
 /* tap a photo to see it large */
 .zoom{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:24px;background:rgba(11,11,12,.88);opacity:0;pointer-events:none;transition:opacity .5s ease;cursor:zoom-out}
@@ -322,14 +324,11 @@ var HUGGERS = [
     el.style.width=w+"px";
     videoEl.style.cssText="display:block;width:100%;height:"+((w-12)*VIDEO_RATIO)+"px;object-fit:cover;background:#000";
     el.appendChild(videoEl);
-    lyricEls=[];
+    lyricEl=null;lyricIdx=-1;lyricT=0;
     if(LYRICS.length){
       var strip=document.createElement("div");strip.className="lyrics";
-      LYRICS.forEach(function(l){
-        var s=document.createElement("span");s.className="lyric";s.textContent=l[2];
-        strip.appendChild(s);lyricEls.push(s);
-      });
-      el.appendChild(strip);
+      lyricEl=document.createElement("span");lyricEl.className="lyric";
+      strip.appendChild(lyricEl);el.appendChild(strip);
     }
     el.addEventListener("click",function(ev){ev.stopPropagation()});
     document.body.appendChild(el);
@@ -347,16 +346,24 @@ var HUGGERS = [
     }catch(e){}
   }
 
-  var lyricEls=[];
+  /* One caption element whose text is swapped, so two lines can never show at once.
+     Phones can report the video's time a little unevenly, so it only ever moves forward. */
+  var lyricEl=null,lyricIdx=-1,lyricT=0;
   function syncLyrics(){
-    var t=videoEl.currentTime;
-    for(var k=0;k<lyricEls.length;k++)
-      lyricEls[k].classList.toggle("on",t>=LYRICS[k][0]&&t<LYRICS[k][1]);
+    lyricT=Math.max(lyricT,videoEl.currentTime);
+    var idx=-1;
+    for(var k=0;k<LYRICS.length;k++)if(lyricT>=LYRICS[k][0]&&lyricT<LYRICS[k][1]){idx=k;break;}
+    if(idx===lyricIdx)return;
+    lyricIdx=idx;
+    if(idx<0){lyricEl.classList.remove("on");return;}
+    lyricEl.textContent=LYRICS[idx][2];
+    lyricEl.classList.remove("in");void lyricEl.offsetWidth;
+    lyricEl.classList.add("on","in");
   }
 
   function tick(now){
     var dt=Math.min(.05,(now-last)/1000);last=now;
-    if(lyricEls.length&&videoEl)syncLyrics();
+    if(lyricEl&&videoEl)syncLyrics();
     var H=innerHeight,topPhoto=Infinity,photosLeft=0;
     for(var i=cards.length-1;i>=0;i--){
       var c=cards[i];
